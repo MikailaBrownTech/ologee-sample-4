@@ -1,0 +1,1372 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Ologee — Course Player</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap">
+
+<style>
+/* ── Tokens ──────────────────────────────────────────────── */
+:root {
+  --black:     #0F0F0D;
+  --ink:       #1A1A18;
+  --emerald:   #187A49;
+  --em-mid:    #1F9A5E;
+  --em-light:  #E8F5EE;
+  --gold:      #B8922E;
+  --gold-lt:   #FDF4E0;
+  --red:       #C0392B;
+  --red-lt:    #FDECEB;
+
+  --canvas:    #F5F4F0;
+  --surface:   #FFFFFF;
+  --surface-2: #F9F8F5;
+  --line:      #E8E7E2;
+  --fg:        #18181A;
+  --fg-2:      #636360;
+  --fg-3:      #A8A8A4;
+
+  --outline-w: 268px;
+  --notes-w:   280px;
+  --topbar-h:  52px;
+
+  font-family: 'Inter', system-ui, sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas:   #111110;
+    --surface:  #1A1A18;
+    --surface-2:#222220;
+    --line:     #2E2E2C;
+    --fg:       #EEECEA;
+    --fg-2:     #909088;
+    --fg-3:     #5A5A56;
+    --em-light: #0D2418;
+    --gold-lt:  #261D08;
+    --red-lt:   #2A0E0C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --canvas:   #111110;
+  --surface:  #1A1A18;
+  --surface-2:#222220;
+  --line:     #2E2E2C;
+  --fg:       #EEECEA;
+  --fg-2:     #909088;
+  --fg-3:     #5A5A56;
+  --em-light: #0D2418;
+  --gold-lt:  #261D08;
+  --red-lt:   #2A0E0C;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input, textarea { font-family: inherit; }
+
+body {
+  background: var(--canvas);
+  color: var(--fg);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════
+   TOPBAR — course header strip
+   ═══════════════════════════════════════ */
+.topbar {
+  height: var(--topbar-h);
+  background: var(--black);
+  display: flex; align-items: center;
+  padding: 0 16px 0 20px;
+  gap: 14px;
+  flex-shrink: 0;
+  z-index: 200;
+}
+.tb-back {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 0.73rem; font-weight: 500;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer; transition: color 0.12s;
+  flex-shrink: 0;
+}
+.tb-back:hover { color: rgba(255,255,255,0.75); }
+.tb-back span { font-size: 0.8rem; }
+.tb-divider { width: 1px; height: 18px; background: rgba(255,255,255,0.1); flex-shrink: 0; }
+.tb-course {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 0.92rem; font-weight: 400;
+  color: rgba(255,255,255,0.82);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; min-width: 0;
+}
+.tb-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.tb-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 0 12px; height: 30px;
+  border-radius: 6px;
+  font-size: 0.71rem; font-weight: 600;
+  cursor: pointer; transition: background 0.12s;
+}
+.tb-btn-ghost {
+  border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.55);
+  background: transparent;
+}
+.tb-btn-ghost:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+.tb-btn-em { background: var(--emerald); color: #fff; border: none; }
+.tb-btn-em:hover { background: var(--em-mid); }
+
+/* Progress bar under topbar */
+.course-progress-bar {
+  height: 2px;
+  background: rgba(255,255,255,0.08);
+  flex-shrink: 0;
+  position: relative;
+}
+.course-progress-bar::after {
+  content: '';
+  position: absolute; inset: 0 auto 0 0;
+  width: 52%;
+  background: var(--emerald);
+}
+
+/* ═══════════════════════════════════════
+   THREE-COLUMN LAYOUT
+   left outline | main content | notes panel
+   ═══════════════════════════════════════ */
+.layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── LEFT OUTLINE ── */
+.outline {
+  width: var(--outline-w);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.outline-head {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.outline-title {
+  font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--fg-3); margin-bottom: 8px;
+}
+.outline-progress {
+  display: flex; align-items: center; gap: 8px;
+}
+.op-bar { flex: 1; height: 3px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.op-fill { height: 100%; background: var(--emerald); border-radius: 99px; }
+.op-pct { font-size: 0.65rem; font-weight: 700; color: var(--emerald); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.outline-body { flex: 1; overflow-y: auto; padding: 10px 0 16px; }
+
+/* Chapter */
+.ch-item { margin-bottom: 2px; }
+.ch-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.11s;
+}
+.ch-head:hover { background: var(--surface-2); }
+.ch-caret {
+  width: 14px; font-size: 0.6rem; color: var(--fg-3);
+  flex-shrink: 0; transition: transform 0.15s;
+  text-align: center;
+}
+.ch-item.open .ch-caret { transform: rotate(90deg); }
+.ch-name {
+  flex: 1; font-size: 0.77rem; font-weight: 600; color: var(--fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ch-prog-ring {
+  width: 20px; height: 20px; flex-shrink: 0;
+}
+
+/* Section */
+.sec-list { padding-left: 0; }
+.sec-item { }
+.sec-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 16px 6px 34px;
+  font-size: 0.69rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+/* Lesson */
+.les-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 14px 7px 34px;
+  cursor: pointer;
+  transition: background 0.11s;
+  position: relative;
+}
+.les-item:hover:not(.locked) { background: var(--surface-2); }
+.les-item.active {
+  background: var(--em-light);
+}
+.les-item.active::before {
+  content: '';
+  position: absolute; left: 0; top: 15%; bottom: 15%;
+  width: 2px; border-radius: 2px;
+  background: var(--emerald);
+}
+.les-item.locked { opacity: 0.4; cursor: default; }
+.les-icon { font-size: 0.75rem; flex-shrink: 0; width: 14px; text-align: center; }
+.les-name {
+  flex: 1; font-size: 0.75rem; font-weight: 500;
+  color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.les-item.active .les-name { color: var(--emerald); font-weight: 600; }
+.les-dur { font-size: 0.62rem; color: var(--fg-3); flex-shrink: 0; }
+.les-check {
+  width: 14px; height: 14px; border-radius: 50%;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem;
+}
+.les-check.done { background: var(--emerald); color: #fff; }
+.les-check.active-dot { background: var(--emerald); opacity: 0.25; }
+.les-check.todo { border: 1.5px solid var(--line); }
+
+/* Outline tabs */
+.outline-tabs {
+  display: flex; border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.otab {
+  flex: 1; padding: 11px 8px;
+  font-size: 0.65rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--fg-3);
+  text-align: center; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.12s;
+}
+.otab:hover { color: var(--fg-2); }
+.otab.active { color: var(--emerald); border-bottom-color: var(--emerald); }
+
+/* ── MAIN CONTENT ── */
+.content-area {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* View panels */
+.view { display: none; flex: 1; flex-direction: column; }
+.view.active { display: flex; }
+
+/* Lesson view */
+.lesson-header {
+  padding: 24px 32px 20px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.lesson-breadcrumb {
+  font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--fg-3); margin-bottom: 8px;
+}
+.lesson-title {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.5rem; font-weight: 400; letter-spacing: -0.01em;
+  color: var(--fg); line-height: 1.2;
+  text-wrap: balance;
+}
+.lesson-meta {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 10px; flex-wrap: wrap;
+}
+.lesson-meta span {
+  font-size: 0.68rem; color: var(--fg-3);
+  display: flex; align-items: center; gap: 4px;
+}
+
+/* Video block */
+.video-block {
+  background: #000;
+  aspect-ratio: 16/9;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.video-bg {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, #14302A, #1A7A4A, #182838);
+  opacity: 0.85;
+}
+.video-play {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px;
+  z-index: 2;
+}
+.play-btn {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255,255,255,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; color: #fff;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+}
+.play-btn:hover { background: rgba(255,255,255,0.25); transform: scale(1.06); }
+.video-caption {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1rem; color: rgba(255,255,255,0.7);
+  text-align: center; max-width: 340px;
+}
+.video-controls {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 10px 16px;
+  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+  display: flex; align-items: center; gap: 10px;
+  z-index: 2;
+}
+.vc-time { font-size: 0.65rem; color: rgba(255,255,255,0.65); font-variant-numeric: tabular-nums; }
+.vc-bar { flex: 1; height: 3px; background: rgba(255,255,255,0.25); border-radius: 99px; cursor: pointer; }
+.vc-fill { height: 100%; width: 36%; background: var(--emerald); border-radius: 99px; }
+.vc-vol { font-size: 0.85rem; color: rgba(255,255,255,0.55); cursor: pointer; }
+.vc-full { font-size: 0.75rem; color: rgba(255,255,255,0.55); cursor: pointer; }
+
+/* Text content */
+.lesson-body {
+  padding: 28px 32px;
+  flex: 1;
+}
+.lesson-body h3 {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.15rem; font-weight: 400;
+  letter-spacing: -0.01em; color: var(--fg);
+  margin: 24px 0 10px;
+}
+.lesson-body h3:first-child { margin-top: 0; }
+.lesson-body p {
+  font-size: 0.86rem; line-height: 1.75;
+  color: var(--fg-2); margin-bottom: 14px;
+  max-width: 680px;
+}
+.lesson-body ul {
+  padding-left: 18px; margin-bottom: 14px;
+}
+.lesson-body li {
+  font-size: 0.84rem; line-height: 1.7;
+  color: var(--fg-2); margin-bottom: 4px;
+}
+.callout {
+  background: var(--em-light);
+  border-left: 3px solid var(--emerald);
+  border-radius: 0 8px 8px 0;
+  padding: 14px 18px;
+  margin: 18px 0;
+  max-width: 680px;
+}
+.callout p { color: var(--fg); margin-bottom: 0; }
+.img-block {
+  width: 100%; max-width: 620px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  aspect-ratio: 16/8;
+  display: flex; align-items: center; justify-content: center;
+  margin: 18px 0;
+  overflow: hidden;
+  position: relative;
+}
+.img-block-bg {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, var(--em-light), var(--surface-2));
+  opacity: 0.5;
+}
+.img-block-label {
+  position: relative; z-index: 1;
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1rem; color: var(--fg-3);
+  text-align: center; padding: 20px;
+}
+.resource-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  max-width: 480px;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.resource-row:hover { border-color: var(--fg-3); }
+.resource-ico { font-size: 1rem; flex-shrink: 0; }
+.resource-name { flex: 1; font-size: 0.77rem; font-weight: 600; color: var(--fg); }
+.resource-dl { font-size: 0.68rem; font-weight: 600; color: var(--emerald); flex-shrink: 0; }
+
+/* Lesson nav footer */
+.lesson-nav {
+  padding: 16px 32px;
+  border-top: 1px solid var(--line);
+  display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+.ln-prev, .ln-next {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 16px; height: 36px;
+  border-radius: 8px;
+  font-size: 0.75rem; font-weight: 600;
+  cursor: pointer; transition: all 0.12s;
+}
+.ln-prev { border: 1px solid var(--line); background: transparent; color: var(--fg-2); }
+.ln-prev:hover { background: var(--surface-2); color: var(--fg); }
+.ln-next { background: var(--fg); color: var(--canvas); border: none; }
+.ln-next:hover { background: var(--emerald); }
+.ln-mark {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 7px;
+  font-size: 0.72rem; font-weight: 600;
+  color: var(--emerald); cursor: pointer;
+}
+.ln-check {
+  width: 17px; height: 17px; border-radius: 50%;
+  background: var(--em-light);
+  border: 1.5px solid var(--emerald);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem; color: var(--emerald);
+}
+
+/* ── Assessment view ── */
+.assessment-wrap {
+  padding: 32px;
+  flex: 1;
+}
+.assess-head {
+  margin-bottom: 28px;
+}
+.assess-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 99px;
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.assess-tag.quiz  { background: var(--em-light); color: var(--emerald); }
+.assess-tag.assign { background: var(--gold-lt); color: var(--gold); }
+.assess-tag.test  { background: var(--red-lt); color: var(--red); }
+.assess-title {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.4rem; font-weight: 400; letter-spacing: -0.01em;
+  color: var(--fg); margin-bottom: 6px;
+}
+.assess-desc { font-size: 0.82rem; color: var(--fg-2); line-height: 1.65; max-width: 600px; }
+.assess-meta { display: flex; gap: 18px; margin-top: 12px; flex-wrap: wrap; }
+.assess-meta span { font-size: 0.7rem; color: var(--fg-3); display: flex; align-items: center; gap: 4px; }
+
+.question-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+  max-width: 700px;
+}
+.q-num { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 8px; }
+.q-text { font-size: 0.88rem; font-weight: 500; color: var(--fg); line-height: 1.55; margin-bottom: 16px; }
+.q-options { display: flex; flex-direction: column; gap: 8px; }
+.q-opt {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer; transition: all 0.11s;
+  background: var(--surface-2);
+}
+.q-opt:hover { border-color: var(--emerald); background: var(--em-light); }
+.q-opt.selected { border-color: var(--emerald); background: var(--em-light); }
+.q-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid var(--line);
+  flex-shrink: 0; margin-top: 1px;
+  transition: all 0.11s;
+}
+.q-opt.selected .q-dot {
+  background: var(--emerald); border-color: var(--emerald);
+}
+.q-opt-text { font-size: 0.8rem; color: var(--fg); line-height: 1.5; }
+.q-opt.selected .q-opt-text { color: var(--emerald); font-weight: 500; }
+
+.assess-actions { display: flex; gap: 10px; margin-top: 20px; max-width: 700px; justify-content: flex-end; }
+
+/* ── Instructor view ── */
+.instructor-wrap { padding: 32px; flex: 1; }
+.inst-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 28px;
+  display: flex; gap: 24px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.inst-av {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--ink), #2A2A48);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.5rem; color: #fff; flex-shrink: 0;
+}
+.inst-info { flex: 1; min-width: 0; }
+.inst-name { font-family: 'DM Serif Display', Georgia, serif; font-size: 1.15rem; color: var(--fg); margin-bottom: 2px; }
+.inst-title { font-size: 0.72rem; color: var(--fg-3); margin-bottom: 12px; }
+.inst-bio { font-size: 0.8rem; color: var(--fg-2); line-height: 1.7; margin-bottom: 16px; }
+.inst-stats { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; }
+.inst-stat-val { font-size: 1rem; font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; }
+.inst-stat-lbl { font-size: 0.62rem; color: var(--fg-3); margin-top: 1px; }
+.inst-contact { display: flex; gap: 8px; flex-wrap: wrap; }
+.inst-contact-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 14px; height: 32px;
+  border-radius: 7px;
+  font-size: 0.73rem; font-weight: 600;
+  cursor: pointer; transition: all 0.12s;
+}
+.ic-em   { background: var(--emerald); color: #fff; border: none; }
+.ic-em:hover { background: var(--em-mid); }
+.ic-ghost { background: transparent; border: 1px solid var(--line); color: var(--fg-2); }
+.ic-ghost:hover { background: var(--surface-2); color: var(--fg); }
+
+/* ── Discussion view ── */
+.discussion-wrap { padding: 24px 32px; flex: 1; }
+.thread-compose {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+.tc-top { display: flex; gap: 10px; align-items: flex-start; }
+.tc-av {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--emerald);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.6rem; font-weight: 700; color: #fff;
+  flex-shrink: 0; margin-top: 2px;
+}
+.tc-input {
+  flex: 1; border: none; background: transparent;
+  font-size: 0.8rem; color: var(--fg); resize: none; outline: none;
+  line-height: 1.5;
+}
+.tc-input::placeholder { color: var(--fg-3); }
+.tc-footer { display: flex; justify-content: flex-end; margin-top: 10px; }
+
+.thread {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.thread-head {
+  display: flex; gap: 10px; padding: 16px 16px 12px;
+}
+.th-av {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.62rem; font-weight: 700; color: var(--fg-2);
+  flex-shrink: 0;
+}
+.th-av.inst { background: var(--ink); color: #fff; border-color: var(--ink); }
+.th-body { flex: 1; min-width: 0; }
+.th-meta { font-size: 0.68rem; color: var(--fg-3); margin-bottom: 5px; }
+.th-meta strong { color: var(--fg); font-weight: 600; }
+.th-text { font-size: 0.8rem; color: var(--fg-2); line-height: 1.6; }
+.thread-replies {
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.reply { display: flex; gap: 10px; }
+.rep-av {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.57rem; font-weight: 700; color: var(--fg-3);
+  flex-shrink: 0;
+}
+.rep-av.inst { background: var(--ink); color: #fff; border-color: var(--ink); }
+.rep-body { flex: 1; min-width: 0; }
+.rep-meta { font-size: 0.63rem; color: var(--fg-3); margin-bottom: 3px; }
+.rep-meta strong { color: var(--fg); font-weight: 600; }
+.rep-text { font-size: 0.77rem; color: var(--fg-2); line-height: 1.6; }
+
+/* ── Overview / Syllabus view ── */
+.overview-wrap { padding: 32px; flex: 1; }
+.ov-hero {
+  background: var(--ink);
+  border-radius: 12px;
+  padding: 28px 28px 24px;
+  position: relative; overflow: hidden;
+  margin-bottom: 24px;
+}
+.ov-hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 0% 50%, rgba(24,122,73,0.28) 0%, transparent 60%);
+}
+.ov-tag {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px; border-radius: 99px;
+  background: rgba(255,255,255,0.08);
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: rgba(255,255,255,0.5); margin-bottom: 10px;
+  position: relative; z-index: 1;
+}
+.ov-title {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.5rem; font-weight: 400; letter-spacing: -0.01em;
+  color: #fff; line-height: 1.2; text-wrap: balance;
+  position: relative; z-index: 1; margin-bottom: 8px;
+}
+.ov-desc { font-size: 0.78rem; color: rgba(255,255,255,0.5); line-height: 1.65; max-width: 560px; position: relative; z-index: 1; margin-bottom: 18px; }
+.ov-stats { display: flex; gap: 20px; flex-wrap: wrap; position: relative; z-index: 1; }
+.ov-stat { }
+.ov-stat-val { font-size: 1.1rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+.ov-stat-lbl { font-size: 0.62rem; color: rgba(255,255,255,0.38); margin-top: 1px; }
+
+.outcomes-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-bottom: 24px;
+}
+.outcome-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.oc-check { font-size: 0.75rem; color: var(--emerald); flex-shrink: 0; margin-top: 1px; }
+.oc-text  { font-size: 0.78rem; color: var(--fg-2); line-height: 1.5; }
+
+/* ── NOTES PANEL ── */
+.notes-panel {
+  width: var(--notes-w);
+  flex-shrink: 0;
+  background: var(--surface-2);
+  border-left: 1px solid var(--line);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  transition: width 0.2s;
+}
+.notes-panel.collapsed { width: 0; border-left: none; overflow: hidden; }
+.notes-head {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0;
+}
+.notes-title { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-3); flex: 1; }
+.notes-close { font-size: 0.85rem; color: var(--fg-3); cursor: pointer; }
+.notes-lesson-label {
+  padding: 8px 14px;
+  font-size: 0.62rem; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--emerald); border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.notes-body {
+  flex: 1; overflow-y: auto;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.note-item {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.note-ts { font-size: 0.6rem; color: var(--fg-3); margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.note-text { font-size: 0.76rem; color: var(--fg); line-height: 1.6; }
+.notes-compose {
+  border-top: 1px solid var(--line);
+  padding: 12px 14px;
+  flex-shrink: 0;
+}
+.notes-textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 9px 11px;
+  font-size: 0.76rem; color: var(--fg);
+  resize: none; outline: none; line-height: 1.55;
+  transition: border-color 0.12s;
+}
+.notes-textarea:focus { border-color: var(--emerald); }
+.notes-textarea::placeholder { color: var(--fg-3); }
+.notes-add-btn {
+  margin-top: 8px; width: 100%; height: 30px;
+  background: var(--fg); color: var(--canvas);
+  border-radius: 7px; font-size: 0.72rem; font-weight: 600;
+  cursor: pointer; transition: background 0.12s;
+  border: none;
+}
+.notes-add-btn:hover { background: var(--emerald); }
+
+/* ── Shared bits ── */
+.pill {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px; border-radius: 99px;
+  font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.pill-em  { background: var(--em-light); color: var(--emerald); }
+.pill-gld { background: var(--gold-lt); color: var(--gold); }
+.pill-neu { background: var(--surface-2); color: var(--fg-2); border: 1px solid var(--line); }
+.btn-em {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 0 16px; height: 34px;
+  border-radius: 8px;
+  background: var(--emerald); color: #fff;
+  font-size: 0.75rem; font-weight: 600;
+  cursor: pointer; transition: background 0.12s; border: none;
+}
+.btn-em:hover { background: var(--em-mid); }
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 0 14px; height: 32px;
+  border-radius: 8px;
+  background: transparent; border: 1px solid var(--line);
+  color: var(--fg-2);
+  font-size: 0.74rem; font-weight: 500;
+  cursor: pointer; transition: all 0.12s;
+}
+.btn-ghost:hover { background: var(--surface); color: var(--fg); }
+
+/* ── Responsive ── */
+@media (max-width: 960px) {
+  :root { --notes-w: 0px; }
+  .notes-panel { display: none; }
+}
+@media (max-width: 720px) {
+  :root { --outline-w: 0px; }
+  .outline { display: none; }
+  .tb-course { font-size: 0.82rem; }
+}
+</style>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="tb-back" onclick="go('lesson')">
+    <span>←</span> Dashboard
+  </div>
+  <div class="tb-divider"></div>
+  <div class="tb-course">Foundations of Restorative Practice</div>
+  <div class="tb-actions">
+    <button class="tb-btn tb-btn-ghost" onclick="toggleNotes()">📝 Notes</button>
+    <button class="tb-btn tb-btn-ghost" onclick="go('overview')">Syllabus</button>
+    <button class="tb-btn tb-btn-em" onclick="go('assessment')">📋 Quiz Due</button>
+  </div>
+</div>
+<div class="course-progress-bar"></div>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- ════ LEFT OUTLINE ════ -->
+  <aside class="outline">
+    <div class="outline-tabs">
+      <div class="otab active" onclick="switchOutlineTab('content',this)">Content</div>
+      <div class="otab" onclick="switchOutlineTab('overview',this)">Overview</div>
+      <div class="otab" onclick="switchOutlineTab('instructor',this)">Instructor</div>
+    </div>
+
+    <div class="outline-head">
+      <div class="outline-title">Course Progress</div>
+      <div class="outline-progress">
+        <div class="op-bar"><div class="op-fill" style="width:52%"></div></div>
+        <div class="op-pct">52%</div>
+      </div>
+    </div>
+
+    <div class="outline-body" id="outline-content">
+
+      <!-- Chapter 1 (done) -->
+      <div class="ch-item open">
+        <div class="ch-head" onclick="toggleChapter(this)">
+          <span class="ch-caret">▶</span>
+          <span class="ch-name">Chapter 1 — Foundations</span>
+          <svg class="ch-prog-ring" viewBox="0 0 20 20">
+            <circle cx="10" cy="10" r="8" fill="none" stroke="var(--line)" stroke-width="2"/>
+            <circle cx="10" cy="10" r="8" fill="none" stroke="var(--emerald)" stroke-width="2"
+              stroke-dasharray="50.3" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 10 10)"/>
+          </svg>
+        </div>
+        <div class="sec-list">
+          <div class="sec-head">Section A · History &amp; Origins</div>
+          <div class="les-item" onclick="go('lesson')">
+            <div class="les-check done">✓</div>
+            <span class="les-icon">▶</span>
+            <span class="les-name">What Is Restorative Practice?</span>
+            <span class="les-dur">8m</span>
+          </div>
+          <div class="les-item" onclick="go('lesson')">
+            <div class="les-check done">✓</div>
+            <span class="les-icon">📄</span>
+            <span class="les-name">Roots in Indigenous Justice</span>
+            <span class="les-dur">5m</span>
+          </div>
+          <div class="les-item" onclick="go('lesson')">
+            <div class="les-check done">✓</div>
+            <span class="les-icon">▶</span>
+            <span class="les-name">Modern Applications Overview</span>
+            <span class="les-dur">11m</span>
+          </div>
+          <div class="sec-head">Section B · Core Principles</div>
+          <div class="les-item" onclick="go('lesson')">
+            <div class="les-check done">✓</div>
+            <span class="les-icon">📄</span>
+            <span class="les-name">The Five Pillars</span>
+            <span class="les-dur">6m</span>
+          </div>
+          <div class="les-item" onclick="go('assessment')">
+            <div class="les-check done">✓</div>
+            <span class="les-icon">✏️</span>
+            <span class="les-name">Quiz: Chapter 1 Check-In</span>
+            <span class="les-dur">10m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chapter 2 (done) -->
+      <div class="ch-item open">
+        <div class="ch-head" onclick="toggleChapter(this)">
+          <span class="ch-caret">▶</span>
+          <span class="ch-name">Chapter 2 — The Circle Process</span>
+          <svg class="ch-prog-ring" viewBox="0 0 20 20">
+            <circle cx="10" cy="10" r="8" fill="none" stroke="var(--line)" stroke-width="2"/>
+            <circle cx="10" cy="10" r="8" fill="none" stroke="var(--emerald)" stroke-width="2"
+              stroke-dasharray="50.3" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 10 10)"/>
+          </svg>
+        </div>
+        <div class="sec-list">
+          <div class="sec-head">Section A · Facilitation</div>
+          <div class="les-item" onclick="go('lesson')">
+            <div class="les-check done">✓</div>
+            <span class="les-icon">▶</span>
+            <span class="les-name">Opening &amp; Closing Circles</span>
+            <span class="les-dur">14m</span>
+          </div>
+          <div class="les-item" onclick="go('lesson')">
+            <div class="les-check done">✓</div>
+            <span class="les-icon">📄</span>
+            <span class="les-name">Role of the Keeper</span>
+            <span class="les-dur">7m</span>
+          </div>
+          <div class="les-item" onclick="go('assessment')">
+            <div class="les-check done">✓</div>
+            <span class="les-icon">📋</span>
+            <span class="les-name">Assignment: Reflection Journal</span>
+            <span class="les-dur">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chapter 3 — IN PROGRESS -->
+      <div class="ch-item open">
+        <div class="ch-head" onclick="toggleChapter(this)">
+          <span class="ch-caret">▶</span>
+          <span class="ch-name">Chapter 3 — Community Contexts</span>
+          <svg class="ch-prog-ring" viewBox="0 0 20 20">
+            <circle cx="10" cy="10" r="8" fill="none" stroke="var(--line)" stroke-width="2"/>
+            <circle cx="10" cy="10" r="8" fill="none" stroke="var(--emerald)" stroke-width="2"
+              stroke-dasharray="50.3" stroke-dashoffset="25" stroke-linecap="round" transform="rotate(-90 10 10)"/>
+          </svg>
+        </div>
+        <div class="sec-list">
+          <div class="sec-head">Section A · Applying the Practice</div>
+          <div class="les-item" onclick="go('lesson')">
+            <div class="les-check done">✓</div>
+            <span class="les-icon">▶</span>
+            <span class="les-name">Restorative Practice in Schools</span>
+            <span class="les-dur">9m</span>
+          </div>
+          <!-- ACTIVE -->
+          <div class="les-item active" onclick="go('lesson')">
+            <div class="les-check active-dot"></div>
+            <span class="les-icon">▶</span>
+            <span class="les-name">Restorative Practice in Healthcare</span>
+            <span class="les-dur">12m</span>
+          </div>
+          <div class="les-item" onclick="go('lesson')">
+            <div class="les-check todo"></div>
+            <span class="les-icon">📄</span>
+            <span class="les-name">Navigating Resistant Participants</span>
+            <span class="les-dur">6m</span>
+          </div>
+          <div class="les-item" onclick="go('assessment')">
+            <div class="les-check todo"></div>
+            <span class="les-icon">✏️</span>
+            <span class="les-name">Quiz: Mid-Course Check</span>
+            <span class="les-dur">15m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chapter 4 — locked -->
+      <div class="ch-item">
+        <div class="ch-head">
+          <span class="ch-caret" style="opacity:.3">▶</span>
+          <span class="ch-name" style="opacity:.4">Chapter 4 — Trauma-Informed Lens</span>
+          <span style="font-size:0.7rem;flex-shrink:0;opacity:0.3">🔒</span>
+        </div>
+      </div>
+
+      <!-- Chapter 5 — locked -->
+      <div class="ch-item">
+        <div class="ch-head">
+          <span class="ch-caret" style="opacity:.3">▶</span>
+          <span class="ch-name" style="opacity:.4">Chapter 5 — Building Sustainable Programs</span>
+          <span style="font-size:0.7rem;flex-shrink:0;opacity:0.3">🔒</span>
+        </div>
+      </div>
+
+      <!-- Chapter 6 — locked -->
+      <div class="ch-item">
+        <div class="ch-head">
+          <span class="ch-caret" style="opacity:.3">▶</span>
+          <span class="ch-name" style="opacity:.4">Chapter 6 — Final Project &amp; Certification</span>
+          <span style="font-size:0.7rem;flex-shrink:0;opacity:0.3">🔒</span>
+        </div>
+      </div>
+
+    </div><!-- /outline-body -->
+  </aside>
+
+  <!-- ════ MAIN CONTENT ════ -->
+  <div class="content-area">
+
+    <!-- ── VIEW: LESSON ── -->
+    <div class="view active" id="view-lesson">
+      <div class="lesson-header">
+        <div class="lesson-breadcrumb">Chapter 3 · Section A</div>
+        <div class="lesson-title">Restorative Practice in Healthcare Settings</div>
+        <div class="lesson-meta">
+          <span>▶ Video · 12 min</span>
+          <span>📖 Reading · 6 min</span>
+          <span>📎 2 resources</span>
+          <span style="margin-left:auto"><span class="pill pill-em">In Progress</span></span>
+        </div>
+      </div>
+
+      <!-- Video player mockup -->
+      <div class="video-block">
+        <div class="video-bg"></div>
+        <div class="video-play">
+          <div class="play-btn">▶</div>
+          <div class="video-caption">Restorative Practice in Healthcare Settings</div>
+        </div>
+        <div class="video-controls">
+          <span class="vc-time">4:22 / 12:08</span>
+          <div class="vc-bar"><div class="vc-fill"></div></div>
+          <span class="vc-vol">🔊</span>
+          <span class="vc-full">⛶</span>
+        </div>
+      </div>
+
+      <!-- Text content -->
+      <div class="lesson-body">
+        <h3>Overview</h3>
+        <p>Healthcare environments present unique challenges for restorative practice — high-stakes decisions, power differentials between providers and patients, and systemic trauma that predates any individual interaction. This lesson examines how restorative principles can be applied in clinical, administrative, and community health contexts.</p>
+
+        <div class="callout">
+          <p><strong>Key concept:</strong> Restorative practice in healthcare isn't about adjudicating harm after the fact — it's a proactive framework for building the relational infrastructure that makes harm less likely and recovery more possible.</p>
+        </div>
+
+        <h3>The Three Entry Points</h3>
+        <p>Practitioners typically enter restorative work in healthcare through one of three contexts:</p>
+        <ul>
+          <li><strong>Patient-provider conflict</strong> — when harm, real or perceived, has occurred during the care relationship</li>
+          <li><strong>Staff-to-staff conflict</strong> — workplace tensions that affect team cohesion and patient outcomes</li>
+          <li><strong>Community re-entry</strong> — supporting patients discharged from institutional care back into community settings</li>
+        </ul>
+
+        <div class="img-block">
+          <div class="img-block-bg"></div>
+          <div class="img-block-label">[ Diagram: Three Entry Points Model ]</div>
+        </div>
+
+        <h3>Adapting Circle Practice</h3>
+        <p>The traditional talking circle must be adapted for clinical environments. Key modifications include shorter session formats compatible with shift-based scheduling, attention to power dynamics between licensed providers and non-clinical staff, and integration with existing case management and social work structures.</p>
+
+        <h3>Resources for This Lesson</h3>
+        <div class="resource-row">
+          <div class="resource-ico">📄</div>
+          <div class="resource-name">Restorative Practice in Clinical Settings — Reference Guide</div>
+          <div class="resource-dl">Download PDF</div>
+        </div>
+        <div class="resource-row">
+          <div class="resource-ico">📋</div>
+          <div class="resource-name">Circle Process Adaptation Template for Healthcare Teams</div>
+          <div class="resource-dl">Download</div>
+        </div>
+      </div>
+
+      <!-- Lesson nav footer -->
+      <div class="lesson-nav">
+        <button class="ln-prev">← Restorative Practice in Schools</button>
+        <button class="ln-next">Navigating Resistant Participants →</button>
+        <div class="ln-mark">
+          <div class="ln-check">✓</div>
+          Mark complete
+        </div>
+      </div>
+    </div>
+
+    <!-- ── VIEW: ASSESSMENT ── -->
+    <div class="view" id="view-assessment">
+      <div class="assessment-wrap">
+        <div class="assess-head">
+          <div class="assess-tag quiz">✏️ Quiz</div>
+          <div class="assess-title">Mid-Course Check: Community Contexts</div>
+          <div class="assess-desc">Test your understanding of Chapters 1–3 before continuing. You need 70% or higher to unlock Chapter 4. You may retake this quiz once.</div>
+          <div class="assess-meta">
+            <span>📝 8 questions</span>
+            <span>⏱ ~15 minutes</span>
+            <span>🔄 1 retake allowed</span>
+            <span>📊 70% to pass</span>
+          </div>
+        </div>
+
+        <div class="question-card">
+          <div class="q-num">Question 1 of 8</div>
+          <div class="q-text">Which of the following best describes the role of the "keeper" in a restorative circle?</div>
+          <div class="q-options">
+            <div class="q-opt" onclick="selectOpt(this)">
+              <div class="q-dot"></div>
+              <div class="q-opt-text">The keeper is a neutral evaluator who decides outcomes for each participant</div>
+            </div>
+            <div class="q-opt selected" onclick="selectOpt(this)">
+              <div class="q-dot"></div>
+              <div class="q-opt-text">The keeper holds the space, guides the process, and ensures all voices are heard without directing outcomes</div>
+            </div>
+            <div class="q-opt" onclick="selectOpt(this)">
+              <div class="q-dot"></div>
+              <div class="q-opt-text">The keeper documents what is said and provides a report to the organization afterward</div>
+            </div>
+            <div class="q-opt" onclick="selectOpt(this)">
+              <div class="q-dot"></div>
+              <div class="q-opt-text">The keeper is always a trained therapist or licensed social worker</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="question-card">
+          <div class="q-num">Question 2 of 8</div>
+          <div class="q-text">Restorative practice in healthcare is best described as:</div>
+          <div class="q-options">
+            <div class="q-opt" onclick="selectOpt(this)">
+              <div class="q-dot"></div>
+              <div class="q-opt-text">A protocol for resolving medical malpractice complaints outside of court</div>
+            </div>
+            <div class="q-opt" onclick="selectOpt(this)">
+              <div class="q-dot"></div>
+              <div class="q-opt-text">A peer mediation program between doctors and nurses</div>
+            </div>
+            <div class="q-opt" onclick="selectOpt(this)">
+              <div class="q-dot"></div>
+              <div class="q-opt-text">A proactive framework for building relational infrastructure that makes harm less likely and recovery more possible</div>
+            </div>
+            <div class="q-opt" onclick="selectOpt(this)">
+              <div class="q-dot"></div>
+              <div class="q-opt-text">A method exclusive to mental health settings with licensed professionals</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="assess-actions">
+          <button class="btn-ghost">Save &amp; Exit</button>
+          <button class="btn-em">Submit Quiz →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── VIEW: OVERVIEW / SYLLABUS ── -->
+    <div class="view" id="view-overview">
+      <div class="overview-wrap">
+        <div class="ov-hero">
+          <div class="ov-tag">Course · 6 Chapters</div>
+          <div class="ov-title">Foundations of Restorative Practice</div>
+          <div class="ov-desc">A foundational course on restorative frameworks applied to community, educational, and healthcare settings. Developed by Dr. Amara Cole in partnership with the Ologee Institute.</div>
+          <div class="ov-stats">
+            <div class="ov-stat"><div class="ov-stat-val">6</div><div class="ov-stat-lbl">Chapters</div></div>
+            <div class="ov-stat"><div class="ov-stat-val">24</div><div class="ov-stat-lbl">Lessons</div></div>
+            <div class="ov-stat"><div class="ov-stat-val">4.5h</div><div class="ov-stat-lbl">Total time</div></div>
+            <div class="ov-stat"><div class="ov-stat-val">3</div><div class="ov-stat-lbl">Quizzes</div></div>
+            <div class="ov-stat"><div class="ov-stat-val">1</div><div class="ov-stat-lbl">Certificate</div></div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:10px">
+          <div style="font-family:'DM Serif Display',Georgia,serif;font-size:1rem;font-weight:400;margin-bottom:12px">What You'll Learn</div>
+        </div>
+        <div class="outcomes-grid" style="margin-bottom:28px;">
+          <div class="outcome-item"><div class="oc-check">✓</div><div class="oc-text">The historical roots and modern applications of restorative practice</div></div>
+          <div class="outcome-item"><div class="oc-check">✓</div><div class="oc-text">How to facilitate restorative circles in community and clinical settings</div></div>
+          <div class="outcome-item"><div class="oc-check">✓</div><div class="oc-text">Strategies for navigating resistance and power dynamics</div></div>
+          <div class="outcome-item"><div class="oc-check">✓</div><div class="oc-text">A trauma-informed lens for all restorative interactions</div></div>
+          <div class="outcome-item"><div class="oc-check">✓</div><div class="oc-text">How to build and sustain restorative programs within organizations</div></div>
+          <div class="outcome-item"><div class="oc-check">✓</div><div class="oc-text">Documentation, evaluation, and continuous improvement practices</div></div>
+        </div>
+
+        <div style="font-family:'DM Serif Display',Georgia,serif;font-size:1rem;font-weight:400;margin-bottom:14px">Assessments &amp; Requirements</div>
+        <div style="display:flex;flex-direction:column;gap:10px;max-width:600px;margin-bottom:28px;">
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-radius:9px;">
+            <span style="font-size:1rem">✏️</span>
+            <div style="flex:1"><div style="font-size:0.8rem;font-weight:600;color:var(--fg)">3 Quizzes</div><div style="font-size:0.68rem;color:var(--fg-3)">After Chapters 1, 3, and 5 · 70% to pass · 1 retake</div></div>
+            <span class="pill pill-em">Required</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-radius:9px;">
+            <span style="font-size:1rem">📋</span>
+            <div style="flex:1"><div style="font-size:0.8rem;font-weight:600;color:var(--fg)">2 Reflection Assignments</div><div style="font-size:0.68rem;color:var(--fg-3)">Chapters 2 and 4 · Graded by instructor</div></div>
+            <span class="pill pill-em">Required</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-radius:9px;">
+            <span style="font-size:1rem">🏆</span>
+            <div style="flex:1"><div style="font-size:0.8rem;font-weight:600;color:var(--fg)">Final Capstone Project</div><div style="font-size:0.68rem;color:var(--fg-3)">Chapter 6 · Design a restorative program for your context</div></div>
+            <span class="pill pill-gld">Certificate Req.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── VIEW: INSTRUCTOR ── -->
+    <div class="view" id="view-instructor">
+      <div class="instructor-wrap">
+        <div style="font-family:'DM Serif Display',Georgia,serif;font-size:1.1rem;font-weight:400;margin-bottom:20px;">Your Instructor</div>
+
+        <div class="inst-card">
+          <div class="inst-av">AC</div>
+          <div class="inst-info">
+            <div class="inst-name">Dr. Amara Cole</div>
+            <div class="inst-title">PhD in Community Psychology · Restorative Justice Practitioner · 18 years experience</div>
+            <div class="inst-bio">Dr. Cole has spent nearly two decades working at the intersection of community healing, restorative justice, and health equity. She has facilitated over 400 restorative circles across schools, healthcare systems, and correctional facilities in the southeastern United States. She currently serves as a senior advisor to the Ologee Institute's Restorative Legacy Ecosystem.</div>
+            <div class="inst-stats">
+              <div><div class="inst-stat-val">3</div><div class="inst-stat-lbl">Courses on Ologee</div></div>
+              <div><div class="inst-stat-val">1,240</div><div class="inst-stat-lbl">Students</div></div>
+              <div><div class="inst-stat-val">4.9</div><div class="inst-stat-lbl">Rating</div></div>
+              <div><div class="inst-stat-val">18</div><div class="inst-stat-lbl">Years experience</div></div>
+            </div>
+            <div class="inst-contact">
+              <button class="inst-contact-btn ic-em" onclick="go('discussion')">💬 Message Dr. Cole</button>
+              <button class="inst-contact-btn ic-ghost">📧 Email</button>
+              <button class="inst-contact-btn ic-ghost">📅 Office Hours</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-family:'DM Serif Display',Georgia,serif;font-size:1rem;font-weight:400;margin-bottom:14px;">Other Courses by Dr. Cole</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
+          <div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;">
+            <div style="height:72px;background:linear-gradient(135deg,#182838,#2A5A7A);display:flex;align-items:flex-end;padding:8px 12px;position:relative;">
+              <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.35),transparent 55%);"></div>
+              <span style="position:relative;z-index:1;font-family:'DM Serif Display',Georgia,serif;font-size:0.78rem;color:#fff;">Trauma-Informed Facilitation</span>
+            </div>
+            <div style="padding:12px 14px;">
+              <div style="font-size:0.76rem;font-weight:600;color:var(--fg);margin-bottom:3px">Trauma-Informed Facilitation Skills</div>
+              <div style="font-size:0.66rem;color:var(--fg-3)">4 modules · $69</div>
+            </div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;">
+            <div style="height:72px;background:linear-gradient(135deg,#2A0E20,#7A2A4A);display:flex;align-items:flex-end;padding:8px 12px;position:relative;">
+              <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.35),transparent 55%);"></div>
+              <span style="position:relative;z-index:1;font-family:'DM Serif Display',Georgia,serif;font-size:0.78rem;color:#fff;">Practitioner Certification Prep</span>
+            </div>
+            <div style="padding:12px 14px;">
+              <div style="font-size:0.76rem;font-weight:600;color:var(--fg);margin-bottom:3px">Restorative Practitioner Cert Prep</div>
+              <div style="font-size:0.66rem;color:var(--fg-3)">6 modules · $95</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── VIEW: DISCUSSION ── -->
+    <div class="view" id="view-discussion">
+      <div class="discussion-wrap">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div style="font-family:'DM Serif Display',Georgia,serif;font-size:1.05rem;font-weight:400">Course Discussion</div>
+            <div style="font-size:0.68rem;color:var(--fg-3);margin-top:3px">Foundations of Restorative Practice · 18 threads · 3 unread</div>
+          </div>
+          <div style="display:flex;gap:7px;">
+            <div style="padding:5px 11px;border-radius:99px;border:1px solid var(--line);background:var(--fg);color:var(--canvas);font-size:0.65rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;">All</div>
+            <div style="padding:5px 11px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--fg-2);font-size:0.65rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;">Chapter 3</div>
+            <div style="padding:5px 11px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--fg-2);font-size:0.65rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;">My Posts</div>
+          </div>
+        </div>
+
+        <!-- Compose -->
+        <div class="thread-compose">
+          <div class="tc-top">
+            <div class="tc-av">JS</div>
+            <textarea class="tc-input" rows="2" placeholder="Start a new thread or ask a question about this course…"></textarea>
+          </div>
+          <div class="tc-footer">
+            <button class="btn-em" style="height:30px;padding:0 14px;font-size:0.72rem">Post Thread</button>
+          </div>
+        </div>
+
+        <!-- Threads -->
+        <div class="thread">
+          <div class="thread-head">
+            <div class="th-av">JS</div>
+            <div class="th-body">
+              <div class="th-meta"><strong>Janelle Stevens</strong> · 2h ago · Chapter 3</div>
+              <div class="th-text">How do you handle a community member who actively resists the restorative circle process — especially when their buy-in is needed for any agreement to hold?</div>
+            </div>
+          </div>
+          <div class="thread-replies">
+            <div class="reply">
+              <div class="rep-av inst">AC</div>
+              <div class="rep-body">
+                <div class="rep-meta"><strong>Dr. Amara Cole</strong> <span style="font-size:0.6rem;margin-left:4px;padding:2px 6px;background:var(--em-light);color:var(--emerald);border-radius:4px;font-weight:700;">Instructor</span> · 1h ago</div>
+                <div class="rep-text">Great question, Janelle. I usually start by having a private "pre-circle" conversation with the resistant participant — not to convince them, but to understand what's driving the resistance. Often it's fear of exposure, not unwillingness to repair. That changes the approach entirely.</div>
+              </div>
+            </div>
+            <div class="reply">
+              <div class="rep-av">RM</div>
+              <div class="rep-body">
+                <div class="rep-meta"><strong>Rosalyn M.</strong> · 45m ago</div>
+                <div class="rep-text">This came up for me in a school context. We found that offering a "partial circle" where the resistant member could contribute a written statement instead of speaking in person reduced the resistance significantly.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="thread">
+          <div class="thread-head">
+            <div class="th-av">TW</div>
+            <div class="th-body">
+              <div class="th-meta"><strong>Terrence W.</strong> · Yesterday · Chapter 2</div>
+              <div class="th-text">In the "Role of the Keeper" reading, Dr. Cole mentions that the keeper should be emotionally neutral but not emotionally absent. Can someone unpack what that distinction looks like in practice?</div>
+            </div>
+          </div>
+          <div class="thread-replies">
+            <div class="reply">
+              <div class="rep-av inst">AC</div>
+              <div class="rep-body">
+                <div class="rep-meta"><strong>Dr. Amara Cole</strong> <span style="font-size:0.6rem;margin-left:4px;padding:2px 6px;background:var(--em-light);color:var(--emerald);border-radius:4px;font-weight:700;">Instructor</span> · Yesterday</div>
+                <div class="rep-text">Neutral means you don't take sides or push toward a particular outcome. Emotionally present means you're tracking the room's energy and responding — if grief surfaces, you honor it; if tension spikes, you slow down. The keeper is a witness, not a wall.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /content-area -->
+
+  <!-- ════ NOTES PANEL ════ -->
+  <aside class="notes-panel" id="notes-panel">
+    <div class="notes-head">
+      <div class="notes-title">Notes</div>
+      <div class="notes-close" onclick="toggleNotes()">✕</div>
+    </div>
+    <div class="notes-lesson-label">Chapter 3 · Healthcare Settings</div>
+    <div class="notes-body">
+      <div class="note-item">
+        <div class="note-ts">4:22 — Video</div>
+        <div class="note-text">"Proactive framework, not reactive adjudication" — good framing for the intake conversation with my supervisor</div>
+      </div>
+      <div class="note-item">
+        <div class="note-ts">Reading</div>
+        <div class="note-text">Three entry points: patient-provider, staff-staff, community re-entry. In our context (transitional care) it's almost always the third.</div>
+      </div>
+      <div class="note-item">
+        <div class="note-ts">Resource</div>
+        <div class="note-text">Download the circle adaptation template — bring to team meeting Oct 22</div>
+      </div>
+    </div>
+    <div class="notes-compose">
+      <textarea class="notes-textarea" rows="3" placeholder="Add a note for this lesson…"></textarea>
+      <button class="notes-add-btn">Add Note</button>
+    </div>
+  </aside>
+
+</div><!-- /layout -->
+
+<script>
+// ── View switching ─────────────────────
+const VIEWS = ['lesson','assessment','overview','instructor','discussion'];
+
+function go(id) {
+  VIEWS.forEach(v => {
+    const el = document.getElementById('view-' + v);
+    if (el) el.classList.toggle('active', v === id);
+  });
+  // sync outline tabs for special views
+  if (id === 'overview')   { switchOutlineTab('overview', document.querySelectorAll('.otab')[1]); }
+  if (id === 'instructor') { switchOutlineTab('instructor', document.querySelectorAll('.otab')[2]); }
+  if (id === 'lesson' || id === 'assessment' || id === 'discussion') {
+    switchOutlineTab('content', document.querySelectorAll('.otab')[0]);
+  }
+  // scroll content area to top
+  document.querySelector('.content-area').scrollTop = 0;
+}
+
+// ── Outline tab ────────────────────────
+const outlineViewMap = { content: 'lesson', overview: 'overview', instructor: 'instructor' };
+
+function switchOutlineTab(id, el) {
+  document.querySelectorAll('.otab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  else {
+    const idx = ['content','overview','instructor'].indexOf(id);
+    if (idx >= 0) document.querySelectorAll('.otab')[idx]?.classList.add('active');
+  }
+  go(outlineViewMap[id] || 'lesson');
+}
+
+// ── Chapter collapse ───────────────────
+function toggleChapter(head) {
+  const item = head.closest('.ch-item');
+  item.classList.toggle('open');
+}
+
+// ── Notes panel ────────────────────────
+function toggleNotes() {
+  document.getElementById('notes-panel').classList.toggle('collapsed');
+}
+
+// ── Quiz option select ─────────────────
+function selectOpt(el) {
+  const card = el.closest('.question-card');
+  card.querySelectorAll('.q-opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+</script>
+
+</body></html>
